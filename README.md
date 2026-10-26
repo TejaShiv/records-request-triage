@@ -33,4 +33,4 @@ Every request and record in this demo is synthetic, written for the prototype. R
 
 ## How it was built
 
-I designed and tested this with Claude, which wrote much of the code. My testing caught a rule that wrongly rejected short, specific requests such as "officer discipline" as too vague, and I had it fixed.
+I designed and tested this with Claude. My testing caught a rule that wrongly rejected short, specific requests such as "officer discipline" as too vague, and I had it fixed.
