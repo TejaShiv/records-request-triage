@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Records Request Triage, a prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,800;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #FFFFFF;
+  --panel: #F5F7F9;
+  --ink: #16212C;
+  --ink-soft: #3E4B57;
+  --rule: #C9D1D8;
+  --go: #1E5E40;
+  --go-tint: #E6F2EB;
+  --wait: #7A4E00;
+  --wait-tint: #FBF0D9;
+  --stop: #9B1F18;
+  --stop-tint: #FBE6E4;
+  --focus: #1F4FB8;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); background: var(--paper); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  font-size: 1.125rem; line-height: 1.65; font-variant-numeric: tabular-nums;
+}
+.wrap { max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+header { border-bottom: 1px solid var(--rule); padding-bottom: 1.5rem; margin-bottom: 2rem; }
+h1 { font-size: clamp(2rem, 4vw, 2.5rem); font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; margin: 0 0 .75rem; }
+.lede { max-width: 42rem; margin: 0; }
+.notice { margin: 1rem 0 0; font-size: 1rem; color: var(--ink-soft); }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2.5rem; align-items: start; }
+@media (max-width: 54rem) { .grid { grid-template-columns: 1fr; } }
+h2 { font-size: 1.3rem; font-weight: 700; margin: 0 0 1rem; }
+label { display: block; font-weight: 700; font-size: 1.15rem; margin-bottom: .5rem; }
+textarea {
+  width: 100%; min-height: 11rem; padding: 1rem; font: inherit; color: var(--ink);
+  background: var(--paper); border: 2px solid var(--ink-soft); border-radius: 6px; resize: vertical;
+}
+textarea::placeholder { color: #66727D; }
+textarea:focus-visible, button:focus-visible, select:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.samples-label { font-weight: 600; font-size: 1rem; margin: 1.25rem 0 .5rem; }
+.samples { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .6rem; margin: 0 0 1.5rem; }
+.samples button {
+  font: inherit; font-size: 1rem; min-height: 48px; padding: .6rem .9rem; border-radius: 6px; cursor: pointer; text-align: left;
+  border: 1px solid var(--rule); background: var(--panel); color: var(--ink);
+}
+.samples button:hover { border-color: var(--ink); }
+.primary {
+  font: inherit; font-weight: 700; font-size: 1.15rem; min-height: 56px; width: 100%; padding: .8rem 1.5rem;
+  border: 0; border-radius: 6px; cursor: pointer; background: var(--ink); color: var(--paper);
+}
+.primary:hover { background: #2B3A49; }
+.hint { font-size: 1rem; color: var(--ink-soft); margin-top: .75rem; }
+
+.slip { background: var(--paper); border: 1px solid var(--rule); border-top: 6px solid var(--ink); border-radius: 6px; padding: 1.5rem 1.75rem 1.75rem; }
+.slip.empty { color: var(--ink-soft); border-top-color: var(--rule); background: var(--panel); min-height: 16rem; display: flex; align-items: center; }
+.slip-head { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; font-size: 1rem; color: var(--ink-soft); border-bottom: 1px solid var(--rule); padding-bottom: .8rem; margin-bottom: 1.1rem; }
+.muted { color: var(--ink-soft); font-size: 1rem; }
+.dept { font-size: clamp(1.75rem, 3.5vw, 2.25rem); font-weight: 700; line-height: 1.2; margin: .2rem 0 .6rem; }
+.meter { height: 12px; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; margin: .6rem 0 .4rem; }
+.meter span { display: block; height: 100%; background: var(--go); transition: width .4s ease; }
+.meter.low span { background: var(--wait); }
+.status { display: block; font-weight: 600; font-size: 1.05rem; padding: .75rem 1rem; border-radius: 6px; margin: 1rem 0 0; }
+.status.go { background: var(--go-tint); color: var(--go); }
+.status.wait { background: var(--wait-tint); color: var(--wait); }
+.flags { margin: 1rem 0 0; padding: 0; list-style: none; }
+.flags li { border-left: 5px solid var(--stop); background: var(--stop-tint); padding: .75rem 1rem; margin-bottom: .6rem; font-size: 1.05rem; border-radius: 0 6px 6px 0; }
+.flags li strong { color: var(--stop); }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: .5rem 1.25rem; margin: 1.25rem 0 0; font-size: 1.05rem; }
+.facts dt { color: var(--ink-soft); }
+.facts dd { margin: 0; font-weight: 600; }
+.actions { display: grid; gap: .75rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); }
+.actions button.accept { font: inherit; font-weight: 700; font-size: 1.1rem; min-height: 52px; border-radius: 6px; cursor: pointer; border: 0; background: var(--go); color: #FFFFFF; }
+.actions button.accept:disabled { background: var(--rule); color: var(--ink-soft); cursor: default; }
+.actions label { font-size: 1rem; font-weight: 600; margin: .25rem 0 0; }
+.actions select { font: inherit; font-size: 1.05rem; min-height: 52px; padding: .5rem .75rem; border: 2px solid var(--ink-soft); border-radius: 6px; background: var(--paper); color: var(--ink); }
+.confirm { font-size: 1.1rem; color: var(--go); font-weight: 700; margin-top: .9rem; min-height: 1.5em; }
+
+section.below { margin-top: 3rem; }
+.cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 2.5rem; }
+@media (max-width: 54rem) { .cols { grid-template-columns: 1fr; } }
+.past { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.past li { padding: 1rem 0; border-bottom: 1px solid var(--rule); }
+.past .q { margin: 0 0 .35rem; }
+.past .m { font-size: 1rem; color: var(--ink-soft); }
+.past .score { display: inline-block; font-size: .95rem; font-weight: 600; color: var(--ink-soft); background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; padding: .05rem .5rem; margin-bottom: .4rem; }
+.public { background: var(--go-tint); padding: 1.1rem 1.25rem; border-radius: 6px; }
+.public p { margin: 0 0 .7rem; }
+.public ul { margin: 0; padding-left: 1.25rem; }
+.public li { margin-bottom: .45rem; }
+.how { margin-top: 3rem; border-top: 1px solid var(--rule); padding-top: 1.75rem; }
+.how .cols p { margin: 0 0 1rem; max-width: 38rem; }
+.log { font-size: 1rem; margin: .5rem 0 0; padding-left: 1.25rem; }
+@media (prefers-reduced-motion: reduce) { .meter span { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Records request triage</h1>
+    <p class="lede">A prototype for a city records office. Paste a public records request and it suggests which department should handle it, shows similar past requests, flags anything that needs legal review, and checks whether the record is already public. Staff make every decision.</p>
+    <p class="notice">Every request and record in this demo is synthetic, written for the prototype. A real deployment would use the city’s own request history.</p>
+  </header>
+
+  <div class="grid">
+    <div>
+      <label for="req">Incoming request</label>
+      <textarea id="req" placeholder="For example, I’d like copies of all inspection reports for the apartment building at 220 Elm Street from the last three years."></textarea>
+      <p class="samples-label" id="samplesLabel">Or try an example</p>
+      <div class="samples" role="group" aria-labelledby="samplesLabel">
+        <button type="button" data-s="0">Pothole complaints</button>
+        <button type="button" data-s="1">Officer discipline</button>
+        <button type="button" data-s="2">Vendor contract</button>
+        <button type="button" data-s="3">Council budget</button>
+        <button type="button" data-s="4">Vague request</button>
+      </div>
+      <button class="primary" id="go" type="button">Suggest a department</button>
+      <p class="hint">Runs entirely in your browser. Nothing you type is sent anywhere.</p>
+    </div>
+
+    <div id="slip" class="slip empty" aria-live="polite">
+      <p>Type or paste a request on the left, then press “Suggest a department.” The result appears here.</p>
+    </div>
+  </div>
+
+  <section class="below" id="below" hidden>
+    <div class="cols">
+      <div>
+        <h2>Similar past requests</h2>
+        <ul class="past" id="past"></ul>
+      </div>
+      <div>
+        <h2>Already public?</h2>
+        <div id="public"></div>
+        <h2 style="margin-top:1.5rem">Staff decisions this session</h2>
+        <p class="muted" id="logEmpty">None yet. Accepted and corrected routings are logged here and would be used to measure and improve accuracy.</p>
+        <ol class="log" id="log"></ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="how">
+    <h2>How it works, and what it never does</h2>
+    <div class="cols">
+      <div>
+        <p>The request is compared against past requests using BM25 keyword scoring plus a small synonym table, so “cop” finds “police” and “pothole” finds “road repair.” The department suggestion is a weighted vote of the five most similar past requests, and its confidence is the share of that vote the top department won.</p>
+        <p>This mirrors a search engine I built earlier over 640 patent applications, which blends BM25 with sentence embeddings and reranks with a cross-encoder. A production version would add those layers. The routing logic would stay the same, because precedent is easier for staff to audit than an unexplained label.</p>
+      </div>
+      <div>
+        <p>It never denies, withholds, or redacts a record. It never sends a reply to a requester. Low confidence and sensitive topics always go to a person.</p>
+        <p>The response deadline shown uses 10 business days as an example. The real number depends on the state’s public records law and would be set with the city’s legal team.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ---------- Synthetic data ---------- */
+const PAST = [
+  ["All 311 complaints about potholes on Washington Street since January 2025", "Public Works", "Fulfilled in 4 days"],
+  ["Road repair schedule and paving contracts for the east side neighborhoods", "Public Works", "Fulfilled in 6 days"],
+  ["Records of water main breaks and sewer backups on Maple Avenue", "Public Works", "Fulfilled in 8 days"],
+  ["Snow plow routes and the number of complaints about unplowed streets last winter", "Public Works", "Fulfilled in 5 days"],
+  ["Streetlight outage reports for Ward 3 for the past year", "Public Works", "Fulfilled in 3 days"],
+  ["Tree removal requests and the permits issued for trees cut on city property", "Parks and Recreation", "Fulfilled in 7 days"],
+  ["Playground inspection and safety reports for Riverside Park", "Parks and Recreation", "Fulfilled in 9 days"],
+  ["Field rental schedules and fees paid by youth sports leagues", "Parks and Recreation", "Fulfilled in 4 days"],
+  ["Police incident reports for the shooting near Central Square on March 4", "Police", "Partially fulfilled, redactions applied"],
+  ["Body camera footage from the traffic stop on Route 9 involving my son", "Police", "Partially fulfilled, redactions applied"],
+  ["Number of arrests by month for 2025 broken down by offense type", "Police", "Fulfilled in 10 days"],
+  ["Use of force reports filed by officers in 2024 and 2025", "Police", "Partially fulfilled, redactions applied"],
+  ["Internal affairs complaints and disciplinary records for Officer J. Ruiz", "Police", "Referred to legal review"],
+  ["Police department overtime spending and staffing levels", "Police", "Fulfilled in 12 days"],
+  ["Building permits issued for 220 Elm Street and any inspection reports", "Building and Inspections", "Fulfilled in 5 days"],
+  ["Code violation notices and inspection history for the apartment complex on Grove Road", "Building and Inspections", "Fulfilled in 7 days"],
+  ["Certificates of occupancy issued for new construction in 2025", "Building and Inspections", "Fulfilled in 6 days"],
+  ["Housing inspection complaints about mold and heat in rental units", "Building and Inspections", "Fulfilled in 8 days"],
+  ["Zoning variance applications for the proposed development on Harbor Street", "Planning", "Fulfilled in 9 days"],
+  ["Planning board site plans and traffic studies for the new shopping center", "Planning", "Fulfilled in 11 days"],
+  ["Master plan drafts and public comments on the downtown rezoning", "Planning", "Fulfilled in 10 days"],
+  ["The contract and invoices for the city’s parking enforcement vendor", "Finance and Procurement", "Fulfilled in 8 days"],
+  ["All bids submitted for the 2025 road resurfacing project and the winning bid", "Finance and Procurement", "Fulfilled in 7 days"],
+  ["Adopted city budget and line item spending by department for fiscal year 2026", "Finance and Procurement", "Fulfilled in 3 days"],
+  ["Payments made to consulting firms over 10,000 dollars in fiscal year 2025", "Finance and Procurement", "Fulfilled in 9 days"],
+  ["Purchase orders for police vehicles and equipment in 2024", "Finance and Procurement", "Fulfilled in 6 days"],
+  ["Salaries and job titles of all city employees", "Human Resources", "Fulfilled in 5 days"],
+  ["Personnel file and performance reviews for a former employee in the clerk’s office", "Human Resources", "Referred to legal review"],
+  ["Job postings and hiring numbers for city positions in 2025", "Human Resources", "Fulfilled in 4 days"],
+  ["Emails between the mayor and council members about the stadium proposal", "City Clerk", "Partially fulfilled, redactions applied"],
+  ["Minutes and recordings of city council meetings from September", "City Clerk", "Fulfilled in 2 days"],
+  ["Campaign finance filings for council candidates in the last election", "City Clerk", "Fulfilled in 3 days"],
+  ["Correspondence received by the council about the short term rental ordinance", "City Clerk", "Fulfilled in 8 days"],
+  ["Business license records for restaurants on Main Street", "City Clerk", "Fulfilled in 3 days"],
+  ["Ambulance response times and fire department call volume for 2025", "Fire and EMS", "Fulfilled in 7 days"],
+  ["Fire inspection reports for the warehouse on Industrial Way", "Fire and EMS", "Fulfilled in 6 days"],
+  ["Fire incident report for the house fire on Oak Lane in August", "Fire and EMS", "Partially fulfilled, redactions applied"]
+];
+
+const PUBLISHED = [
+  ["City council meeting minutes and video archive", "Posted on the council meetings page within 7 days of each meeting"],
+  ["Adopted annual budget and quarterly spending reports", "Finance department budget page"],
+  ["Employee salary database", "Open data portal, updated every fiscal year"],
+  ["Active building permit search", "Online permit portal, searchable by address"],
+  ["Monthly police crime statistics dashboard", "Police department open data dashboard"],
+  ["Awarded city contracts over 25,000 dollars", "Procurement transparency page"],
+  ["311 service request map including potholes and streetlights", "311 open data map"],
+  ["Campaign finance reports", "City clerk elections page"]
+];
+
+const SAMPLES = [
+  "Can I get all complaints the city received about potholes on my street, Linden Avenue, in the last two years and what was done about them?",
+  "I am requesting any disciplinary records, internal affairs investigations, or complaints filed against the officer who arrested me on October 2.",
+  "Please send me the current contract between the city and the company that runs the parking ticket system, plus what the city paid them last year.",
+  "I want to see how much the city council spent this year and the approved budget.",
+  "Send me everything about the thing that happened downtown."
+];
+
+/* Sensitive topics. Matching any of these sends the request to a person, it never blocks it. */
+const SENSITIVE = [
+  [/\b(disciplin\w*|internal affairs|misconduct)\b/i, "Personnel or discipline records", "May involve employee privacy exemptions"],
+  [/\bpersonnel (file|record)s?\b|\bperformance review/i, "Personnel file", "May involve employee privacy exemptions"],
+  [/\b(medical|health record|hipaa|diagnos\w*)\b/i, "Medical information", "May involve health privacy protections"],
+  [/\b(juvenile|minor|my son|my daughter|child|student)\b/i, "A minor may be involved", "Records about minors often carry extra protections"],
+  [/\b(body ?cam\w*|footage|investigation|investigative|arrest(ed)?)\b/i, "Law enforcement record", "May involve open investigation or privacy exemptions"],
+  [/\b(social security|ssn|home address|date of birth)\b/i, "Personal identifiers", "May require redaction of personal information"]
+];
+
+/* ---------- Retrieval ---------- */
+const STOP = new Set("a an and the of for to in on at by from with about any all my me i we our is are was were be been this that these those it its as or can please send copies copy records record request requesting want would like get see last past since what who how much there their them have has had do did".split(" "));
+
+const SYN = [
+  ["police", "cop", "officer", "officers", "arrest", "arrested"],
+  ["pothole", "road", "street", "paving", "resurfacing"],
+  ["permit", "construction", "inspection", "inspections"],
+  ["contract", "vendor", "company", "bid", "bids", "procurement", "invoice", "invoices", "paid", "payments"],
+  ["email", "emails", "correspondence", "letters"],
+  ["park", "playground", "tree", "trees", "field"],
+  ["salary", "salaries", "payroll", "employee", "employees"],
+  ["zoning", "variance", "development", "rezoning"],
+  ["water", "sewer", "pipe", "main"],
+  ["budget", "spending", "spent", "spend", "fiscal"],
+  ["council", "councilor", "mayor"],
+  ["complaint", "complaints", "311"],
+  ["fire", "ems", "ambulance"],
+  ["discipline", "disciplinary", "misconduct", "internal"]
+];
+
+const KEEP = new Set(["parking", "building", "housing", "zoning", "planning", "spending"]);
+function stem(w) {
+  if (KEEP.has(w)) return w;
+  if (w.length > 4 && w.endsWith("ies")) return w.slice(0, -3) + "y";
+  if (w.length > 5 && w.endsWith("ing")) return w.slice(0, -3);
+  if (w.length > 4 && w.endsWith("ed")) return w.slice(0, -2);
+  if (w.length > 3 && w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1);
+  return w;
+}
+function tokens(text) {
+  return text.toLowerCase().replace(/[’']/g, "").split(/[^a-z0-9]+/).filter(w => w && !STOP.has(w)).map(stem);
+}
+const SYNMAP = new Map();
+SYN.forEach(group => {
+  const stems = [...new Set(group.map(stem))];
+  stems.forEach(s => SYNMAP.set(s, stems));
+});
+
+function buildIndex(docs) {
+  const toks = docs.map(tokens);
+  const N = toks.length;
+  const avg = toks.reduce((a, t) => a + t.length, 0) / N;
+  const df = new Map();
+  toks.forEach(t => new Set(t).forEach(w => df.set(w, (df.get(w) || 0) + 1)));
+  return { toks, N, avg, df };
+}
+
+/* Query terms carry weights. Original words count fully, synonyms count half. */
+function queryWeights(text) {
+  const q = new Map();
+  tokens(text).forEach(t => {
+    q.set(t, Math.max(q.get(t) || 0, 1));
+    (SYNMAP.get(t) || []).forEach(s => { if (s !== t) q.set(s, Math.max(q.get(s) || 0, 0.5)); });
+  });
+  return q;
+}
+
+function bm25(index, text, k1 = 1.4, b = 0.75) {
+  const q = queryWeights(text);
+  return index.toks.map((doc, i) => {
+    const tf = new Map();
+    doc.forEach(w => tf.set(w, (tf.get(w) || 0) + 1));
+    let s = 0;
+    q.forEach((wt, term) => {
+      const f = tf.get(term);
+      if (!f) return;
+      const n = index.df.get(term) || 0;
+      const idf = Math.log(1 + (index.N - n + 0.5) / (n + 0.5));
+      s += wt * idf * (f * (k1 + 1)) / (f + k1 * (1 - b + b * doc.length / index.avg));
+    });
+    return { i, s };
+  }).sort((a, z) => z.s - a.s);
+}
+
+const PAST_INDEX = buildIndex(PAST.map(p => p[0]));
+const PUB_INDEX = buildIndex(PUBLISHED.map(p => p[0] + " " + p[1]));
+const MIN_MATCH = 2.5;
+const MIN_CONF = 0.6;
+const VAGUE = /\b(everything|anything|thing|things|stuff|whatever|all info\w*)\b/i;
+
+/* A request is too vague when it has no meaningful words, or leans on words like "everything" without naming much.
+   Short but specific requests, like "officer discipline", are judged by how well they match past cases instead. */
+function isVague(text) {
+  const n = new Set(tokens(text)).size;
+  return n === 0 || (VAGUE.test(text) && n < 6);
+}
+
+function triage(text) {
+  const ranked = bm25(PAST_INDEX, text);
+  const top = ranked.slice(0, 5).filter(r => r.s > 0);
+  const votes = new Map();
+  top.forEach(r => votes.set(PAST[r.i][1], (votes.get(PAST[r.i][1]) || 0) + r.s));
+  const total = [...votes.values()].reduce((a, v) => a + v, 0);
+  const tally = [...votes.entries()].map(([d, v]) => ({ d, share: total ? v / total : 0 })).sort((a, z) => z.share - a.share);
+  const best = top.length ? top[0].s : 0;
+  const flags = SENSITIVE.filter(([re]) => re.test(text)).map(([, title, why]) => ({ title, why }));
+  const weak = best < MIN_MATCH || isVague(text);
+  const dept = tally.length && !weak ? tally[0].d : null;
+  const conf = dept ? tally[0].share : 0;
+  const also = tally.slice(1).filter(t => t.share >= 0.3).map(t => t.d);
+  const review = !dept || conf < MIN_CONF || flags.length > 0;
+  const pub = bm25(PUB_INDEX, text).filter(r => r.s >= 2.0).slice(0, 2).map(r => PUBLISHED[r.i]);
+  return { dept, conf, also, flags, review, weak, similar: top, pub };
+}
+
+function addBusinessDays(date, n) {
+  const d = new Date(date);
+  while (n > 0) { d.setDate(d.getDate() + 1); const w = d.getDay(); if (w !== 0 && w !== 6) n--; }
+  return d;
+}
+
+/* ---------- Interface ---------- */
+if (typeof document !== "undefined") {
+  const $ = id => document.getElementById(id);
+  const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const DEPTS = [...new Set(PAST.map(p => p[1]))].sort();
+  const fmt = d => d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  let counter = 1041;
+  let current = null;
+
+  function render() {
+    const text = $("req").value.trim();
+    if (!text) { $("req").focus(); return; }
+    const r = triage(text);
+    current = { text, r, id: ++counter };
+    const today = new Date();
+    const slip = $("slip");
+    slip.className = "slip";
+    const pct = Math.round(r.conf * 100);
+    let statusHtml;
+    if (r.weak) statusHtml = `<span class="status wait">Needs staff review. The request is too vague to match past cases, so a clarifying question to the requester is the likely next step.</span>`;
+    else if (r.review) statusHtml = `<span class="status wait">Needs staff review before routing</span>`;
+    else statusHtml = `<span class="status go">Ready to route. Staff confirm with one click.</span>`;
+
+    slip.innerHTML = `
+      <div class="slip-head"><span>Request R-2026-${current.id}</span><span>Received ${fmt(today)}</span></div>
+      <div class="muted">Suggested department</div>
+      <div class="dept">${r.dept ? esc(r.dept) : "No confident match"}</div>
+      ${r.dept ? `<div class="meter ${r.conf < MIN_CONF ? "low" : ""}" role="img" aria-label="Confidence ${pct} percent"><span style="width:${pct}%"></span></div>
+      <div class="muted">${pct}% of the vote from similar past requests${r.also.length ? `. May also involve ${esc(r.also.join(" and "))}.` : "."}</div>` : ""}
+      ${statusHtml}
+      ${r.flags.length ? `<ul class="flags">${r.flags.map(f => `<li><strong>${esc(f.title)}.</strong> ${esc(f.why)}. Legal review before release.</li>`).join("")}</ul>` : ""}
+      <dl class="facts">
+        <dt>Response due</dt><dd>${fmt(addBusinessDays(today, 10))}, 10 business days</dd>
+        <dt>Already public</dt><dd>${r.pub.length ? "Likely, see below" : "No match found"}</dd>
+      </dl>
+      <div class="actions">
+        <button type="button" class="accept" id="accept" ${r.dept ? "" : "disabled"}>Accept routing</button>
+        <label for="override">Or send it to a different department</label>
+        <select id="override"><option value="">Choose a department</option>${DEPTS.map(d => `<option>${esc(d)}</option>`).join("")}</select>
+      </div>
+      <div class="confirm" id="confirm" aria-live="polite"></div>`;
+
+    $("past").innerHTML = r.similar.length ? r.similar.map(s => `
+      <li><span class="score">${s.s >= 8 ? "Close match" : s.s >= 4 ? "Partial match" : "Weak match"}</span>
+        <p class="q">${esc(PAST[s.i][0])}</p>
+        <div class="m">${esc(PAST[s.i][1])}. ${esc(PAST[s.i][2])}.</div></li>`).join("")
+      : `<li class="muted">No past request shares enough words with this one.</li>`;
+
+    $("public").innerHTML = r.pub.length
+      ? `<div class="public"><p>This may already be published. Staff can point the requester there and close the request faster.</p><ul>${r.pub.map(p => `<li><strong>${esc(p[0])}</strong>. ${esc(p[1])}.</li>`).join("")}</ul></div>`
+      : `<p class="muted">Nothing in the city’s published records matches closely.</p>`;
+
+    $("below").hidden = false;
+    $("accept").addEventListener("click", () => decide(r.dept, true));
+    $("override").addEventListener("change", e => { if (e.target.value) decide(e.target.value, false); });
+  }
+
+  function decide(dept, accepted) {
+    if (!current) return;
+    const msg = accepted ? `Routed to ${dept}.` : `Routed to ${dept}. Correction logged.`;
+    $("confirm").textContent = msg;
+    $("logEmpty").hidden = true;
+    const li = document.createElement("li");
+    li.textContent = `R-2026-${current.id} ${accepted ? "accepted as" : "corrected to"} ${dept}${!accepted && current.r.dept ? `, suggested ${current.r.dept}` : ""}`;
+    $("log").appendChild(li);
+    $("accept").disabled = true;
+    $("override").disabled = true;
+  }
+
+  $("go").addEventListener("click", render);
+  $("req").addEventListener("keydown", e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) render(); });
+  document.querySelectorAll(".samples button").forEach(b => b.addEventListener("click", () => {
+    $("req").value = SAMPLES[+b.dataset.s];
+    render();
+  }));
+}
+</script>
+</body>
+</html>
